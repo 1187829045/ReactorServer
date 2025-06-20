@@ -25,8 +25,7 @@ int main(int argc,char *argv[])
 {
     if (argc != 3)
     {
-        printf("usage: ./tcpepoll ip port\n");
-        printf("example: ./tcpepoll 192.168.150.128 5085\n\n");
+        std::cerr << "argc != 3"<<std::endl;
         return -1;
     }
 
@@ -38,10 +37,11 @@ int main(int argc,char *argv[])
     int listenfd = socket(AF_INET,SOCK_STREAM,IPPROTO_TCP);
     if (listenfd < 0)
     {
-        perror("socket() failed"); return -1;
+        perror("socket() failed");
+        return -1;
     }
 
-    // 设置listenfd的属性，如果对这些属性不熟悉，百度之。
+
     int opt = 1;
     // 必须的。 SO_REUSEADDR：允许地址重用
     setsockopt(listenfd,SOL_SOCKET,SO_REUSEADDR,&opt,static_cast<socklen_t>(sizeof opt));
@@ -56,31 +56,33 @@ int main(int argc,char *argv[])
     setnonblocking(listenfd);
 
      // 服务端地址的结构体
-    struct sockaddr_in servaddr;
+    sockaddr_in servaddr;
      // IPv4网络协议的套接字类型。
     servaddr.sin_family = AF_INET;
     // 服务端用于监听的ip地址。
     servaddr.sin_addr.s_addr = inet_addr(argv[1]);
      // 服务端用于监听的端口。
     servaddr.sin_port = htons(atoi(argv[2]));
-
+    std::cout<<"ip:"<<servaddr.sin_addr.s_addr<<"port:"<<servaddr.sin_port<<std::endl;
     //将创建好的 socket（listenfd）绑定到指定的本地 IP 地址和端口上，如果绑定失败，返回负值 < 0，表示出错。
-    if (bind(listenfd,(struct sockaddr *)&servaddr,sizeof(servaddr)) < 0 )
+    if (bind(listenfd,(sockaddr *)&servaddr,sizeof(servaddr)) < 0 )
     {
-        perror("bind() failed");
+        std::cerr<<"bind() failed"<<std::endl;
         close(listenfd);
         return -1;
     }
     //开始监听某个端口上的客户端连接请求，并设置最大连接队列长度为 128。如果监听失败，返回的值不等于 0（通常返回 -1），表示出错。
     if (listen(listenfd,128) != 0 )
     {
-        perror("listen() failed"); close(listenfd); return -1;
+        std::cerr<<"listen() failed"<<std::endl;
+        close(listenfd);
+        return -1;
     }
 
     //创建一个 epoll 实例，返回一个文件描述符 epollfd。参数 1 在现代 Linux 中已经没意义了（旧版本用于指定最大监听数），通常写成大于 0 的任意值即可。
     int epollfd=epoll_create(1);
     //声明一个 epoll 事件结构体 ev，用来描述你想监听的事件，比如“读事件”“写事件”。
-    struct epoll_event ev;
+     epoll_event ev;
     //告诉 epoll：“我想监听的目标是 listenfd 这个 socket（监听套接字）”。
     ev.data.fd=listenfd;
    //这是默认的 “水平触发（Level Trigger，LT）” 模式
@@ -88,7 +90,7 @@ int main(int argc,char *argv[])
    //把 listenfd 加入到 epollfd 的监听队列中，并设置它的监听事件为 ev。
     epoll_ctl(epollfd,EPOLL_CTL_ADD,listenfd,&ev);
    // 创建一个 epoll_event 数组，容量为 10，用来保存 epoll_wait() 返回的就绪事件。
-    struct epoll_event evs[10];
+    epoll_event evs[10];
 
       // 事件循环。
     while (true)
@@ -115,7 +117,7 @@ int main(int argc,char *argv[])
             if (evs[ii].data.fd==listenfd)
             {
                 // 定义一个结构体变量，用来存储客户端的地址信息（IP地址和端口号）
-                struct sockaddr_in clientaddr;
+                sockaddr_in clientaddr;
 
                 // 定义一个变量，存储客户端地址结构体的大小，accept调用时需要传入该长度
                 socklen_t len = sizeof(clientaddr);
@@ -134,53 +136,67 @@ int main(int argc,char *argv[])
                 // 为新客户端连接准备读事件，并添加到epoll中。
                 ev.data.fd=clientfd;
                 ev.events=EPOLLIN|EPOLLET;           // 边缘触发。
+                //把客户端的 clientfd 加入到 epoll 实例 epollfd 的监听事件中，并指定要监听的事件类型（由 ev 定义）。
                 epoll_ctl(epollfd,EPOLL_CTL_ADD,clientfd,&ev);
-            }else
+            }
+            else  // 如果不是 listenfd（监听套接字），就是已连接客户端的 socket 有事件发生
             {
-
-                if (evs[ii].events & EPOLLRDHUP)                     // 对方已关闭，有些系统检测不到，可以使用EPOLLIN，recv()返回0。
+                // 如果事件中包含 EPOLLRDHUP，说明对方已经关闭连接（半关闭或全关闭）
+                if (evs[ii].events & EPOLLRDHUP)
                 {
-                    printf("1client(eventfd=%d) disconnected.\n",evs[ii].data.fd);
-                    close(evs[ii].data.fd);            // 关闭客户端的fd。
-                }                                //  普通数据  带外数据
-                else if (evs[ii].events & (EPOLLIN|EPOLLPRI))   // 接收缓冲区中有数据可以读。
+                    printf("1client(eventfd=%d) disconnected.\n", evs[ii].data.fd);
+                    close(evs[ii].data.fd); // 关闭这个客户端的连接
+                }
+                // 如果事件中包含 EPOLLIN（普通数据可读）或 EPOLLPRI（带外数据可读）
+                else if (evs[ii].events & (EPOLLIN | EPOLLPRI))
                 {
-                    char buffer[1024];
-                    while (true)             // 由于使用非阻塞IO，一次读取buffer大小数据，直到全部的数据读取完毕。
+                    char buffer[1024];  // 定义接收缓冲区
+                    while (true)  // 循环读取，直到没有更多数据（非阻塞模式 + 边缘触发必须这样做）
                     {
+                        // 将 buffer 清零，防止残留数据干扰输出
                         bzero(&buffer, sizeof(buffer));
-                        ssize_t nread = read(evs[ii].data.fd, buffer, sizeof(buffer));    // 这行代码用了read()，也可以用recv()，一样的，不要纠结。
-                        if (nread > 0)      // 成功的读取到了数据。
+
+                        // 从对应 fd 中读取数据，nread 表示读取到的字节数
+                        ssize_t nread = read(evs[ii].data.fd, buffer, sizeof(buffer));
+
+                        if (nread > 0)  // 成功读取到数据
                         {
-                            // 把接收到的报文内容原封不动的发回去。
-                            printf("recv(eventfd=%d):%s\n",evs[ii].data.fd,buffer);
-                            send(evs[ii].data.fd,buffer,strlen(buffer),0);
+                            // 打印接收到的内容
+                            printf("recv(eventfd=%d):%s\n", evs[ii].data.fd, buffer);
+
+                            // 将接收到的数据原样发回给客户端（回显服务器）
+                            send(evs[ii].data.fd, buffer, strlen(buffer), 0);
                         }
-                        else if (nread == -1 && errno == EINTR) // 读取数据的时候被信号中断，继续读取。
+                        // 如果 read 被信号中断（如 Ctrl+C 触发中断信号），继续读取
+                        else if (nread == -1 && errno == EINTR)
                         {
                             continue;
                         }
-                        else if (nread == -1 && ((errno == EAGAIN) || (errno == EWOULDBLOCK))) // 全部的数据已读取完毕。
+                        // 如果读取不到数据且返回 EAGAIN 或 EWOULDBLOCK，说明当前已无数据（非阻塞特有现象）
+                        else if (nread == -1 && ((errno == EAGAIN) || (errno == EWOULDBLOCK)))
                         {
-                            break;
+                            break; // 跳出循环，后面没有数据了
                         }
-                        else if (nread == 0)  // 客户端连接已断开。
+                        // 如果 read 返回 0，说明客户端已经关闭连接
+                        else if (nread == 0)
                         {
-                            printf("2client(eventfd=%d) disconnected.\n",evs[ii].data.fd);
-                            close(evs[ii].data.fd);            // 关闭客户端的fd。
-                            break;
+                            printf("2client(eventfd=%d) disconnected.\n", evs[ii].data.fd);
+                            close(evs[ii].data.fd); // 关闭客户端连接
+                            break; // 跳出读取循环
                         }
                     }
                 }
-                else if (evs[ii].events & EPOLLOUT)                  // 有数据需要写，暂时没有代码，以后再说。
+                // 如果事件是可写（EPOLLOUT），表示有数据可以写，暂时没有处理逻辑
+                else if (evs[ii].events & EPOLLOUT)
                 {
+                    // 这里可以放写操作（例如发送数据给客户端），暂时没有实现
                 }
-                else                                                                    // 其它事件，都视为错误。
+                // 如果都不是以上情况，说明是未知或错误事件，统一按异常处理
+                else
                 {
-                    printf("3client(eventfd=%d) error.\n",evs[ii].data.fd);
-                    close(evs[ii].data.fd);            // 关闭客户端的fd。
+                    printf("3client(eventfd=%d) error.\n", evs[ii].data.fd);
+                    close(evs[ii].data.fd); // 关闭客户端连接，防止资源泄漏
                 }
-                ////////////////////////////////////////////////////////////////////////
             }
         }
     }
