@@ -73,24 +73,24 @@ int main(int argc, char *argv[]) {
                     ev.data.fd = clientsock->fd();
                     ev.events = EPOLLIN | EPOLLET;  // 边缘触发
                     epoll_ctl(epollfd, EPOLL_CTL_ADD, clientsock->fd(), &ev);
-                }
 
-                char buffer[1024];  // 接收缓冲区
-                while (true) {
-                    bzero(&buffer, sizeof(buffer));
-                    ssize_t nread = read(evs[ii].data.fd, buffer, sizeof(buffer));
-
-                    if (nread > 0) {
-                        printf("recv(eventfd=%d): %s\n", evs[ii].data.fd, buffer);
-                        send(evs[ii].data.fd, buffer, strlen(buffer), 0);  // 回显
-                    } else if (nread == -1 && errno == EINTR) {
-                        continue;  // 信号中断，继续读取
-                    } else if (nread == -1 && ((errno == EAGAIN) || (errno == EWOULDBLOCK))) {
-                        break;  // 当前已无数据
-                    } else if (nread == 0) {
-                        printf("client(eventfd=%d) disconnected.\n", evs[ii].data.fd);
-                        close(evs[ii].data.fd);
-                        break;
+                }else {
+                    char buffer[1024];  // 接收缓冲区
+                    while (true) {
+                        bzero(&buffer, sizeof(buffer));
+                        ssize_t nread = read(evs[ii].data.fd, buffer, sizeof(buffer));
+                        if (nread > 0) {
+                            printf("recv(eventfd=%d): %s\n", evs[ii].data.fd, buffer);
+                            send(evs[ii].data.fd, buffer, strlen(buffer), 0);  // 回显
+                        } else if (nread == -1 && errno == EINTR) {
+                                            continue;  // 信号中断，继续读取
+                        } else if (nread == -1 && ((errno == EAGAIN) || (errno == EWOULDBLOCK))) {
+                                            break;  // 当前已无数据
+                        } else if (nread == 0) {
+                            printf("client(eventfd=%d) disconnected.\n", evs[ii].data.fd);
+                            close(evs[ii].data.fd);
+                            break;
+                        }
                     }
                 }
             } else if (evs[ii].events & EPOLLOUT) {
