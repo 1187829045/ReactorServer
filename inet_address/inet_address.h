@@ -11,6 +11,7 @@
 
 class InetAddress {
 public:
+ InetAddress();
  InetAddress(const std::string &ip,uint16_t  port);
  InetAddress(const sockaddr_in addr);
  ~InetAddress();
@@ -18,7 +19,7 @@ public:
  const char*ip()const;
  uint16_t port()const;
  const sockaddr *addr()const;
-
+ void setaddr(sockaddr_in clientaddr);   // 设置addr_成员的值。
 private:
  sockaddr_in addr_;
 };
