@@ -4,10 +4,14 @@
 
 #ifndef INET_ADDRESS_H
 #define INET_ADDRESS_H
-#include<arpa/inet.h>
 #include<netinet/in.h>
 #include<string>
-
+#include <unistd.h>       // for close
+#include <arpa/inet.h>    // for inet_ntoa, inet_addr
+#include <netinet/tcp.h>  // for TCP_NODELAY
+#include <cerrno>         // for errno
+#include <cstdio>         // for printf, perror
+#include <cstdlib>        // for exit
 
 class InetAddress {
 public:

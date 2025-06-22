@@ -5,14 +5,8 @@
 #ifndef SOCKET_H
 #define SOCKET_H
 
-#include <sys/types.h>
 #include <sys/socket.h>
-#include <netinet/tcp.h>
-#include <string.h>
-#include <errno.h>
-#include <unistd.h>
 #include"../inet_address/inet_address.h"
-// 创建一个非阻塞的socket。
 int createnonblocking();
 
 // socket类。
