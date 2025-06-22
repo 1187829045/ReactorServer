@@ -14,6 +14,8 @@
 #include"../inet_address/inet_address.h"
 #include "../socket/socket.h"
 #include"../epoll/epoll.h"
+
+
 int main(int argc, char *argv[]) {
     if (argc != 3) {
         std::cerr << "argc != 3" << std::endl;
@@ -29,34 +31,12 @@ int main(int argc, char *argv[]) {
     servsock.bind(servaddr);
     servsock.listen();
 
-    // // 创建 epoll 实例
-    // int epollfd = epoll_create(1);
-    // epoll_event ev;
-    // ev.data.fd = servsock.fd();
-    // // 默认水平触发（Level Trigger，LT）模式
-    // ev.events = EPOLLIN;
-    // epoll_ctl(epollfd, EPOLL_CTL_ADD, servsock.fd(), &ev);
-    // epoll_event evs[10];  // 就绪事件数组
-
-
     Epoll ep;
     ep.addfd(servsock.fd(),EPOLLIN);
     std::vector<epoll_event> evs;
     // 事件循环
     while (true) {
-        // int infds = epoll_wait(epollfd, evs, 10, -1);
-        //
-        // // 返回失败
-        // if (infds < 0) {
-        //     perror("epoll_wait() failed");
-        //     break;
-        // }
-        //
-        // // 超时
-        // if (infds == 0) {
-        //     std::cerr << "epoll_wait() timeout" << std::endl;
-        //     continue;
-        // }
+
         evs = ep.loop();//等待监听的fd事件发生
         // 遍历所有发生的事件
         for (auto &ev:evs) {
