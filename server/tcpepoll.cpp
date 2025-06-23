@@ -32,55 +32,15 @@ int main(int argc, char *argv[]) {
     servsock.listen();
 
     Epoll ep;
-    ep.addfd(servsock.fd(),EPOLLIN);
-    std::vector<epoll_event> evs;
+    // ep.addfd(servsock.fd(),EPOLLIN);    // 让epoll监视listenfd的读事件，采用水平触发。
+    Channel *servchannel=new Channel(&ep,servsock.fd(),true);       // 这里new出来的对象没有释放，这个问题以后再解决。
+    servchannel->enablereading();       // 让epoll_wait()监视servchannel的读事件。
     // 事件循环
     while (true) {
-
-        evs = ep.loop();//等待监听的fd事件发生
+       std::vector<Channel *> channels=ep.loop();         // 等待监视的fd有事件发生。
         // 遍历所有发生的事件
-        for (auto &ev:evs) {
-            if (ev.events & EPOLLRDHUP) {
-                printf("1client(eventfd=%d) disconnected.\n", ev.data.fd);
-                close(ev.data.fd);  // 关闭这个客户端的连接
-            } else if (ev.events & (EPOLLIN | EPOLLPRI)) {
-                // 如果是listenfd有事件，表示有新的客户端连上来。
-                if (ev.data.fd == servsock.fd()) {
-                    InetAddress clientaddr;
-                    Socket *clientsock = new Socket(servsock.accept(clientaddr));
-
-                    printf("accept client(fd=%d, ip=%s, port=%d) ok.\n",
-                                               clientsock->fd(), clientaddr.ip(), clientaddr.port());
-                    // 为新客户端连接准备读事件，并添加到epoll中。
-                    // ev.data.fd = clientsock->fd();
-                    // ev.events = EPOLLIN | EPOLLET;  // 边缘触发
-                    // epoll_ctl(epollfd, EPOLL_CTL_ADD, clientsock->fd(), &ev);
-                    ep.addfd(clientsock->fd(),EPOLLIN | EPOLLET);
-                }else {
-                    char buffer[1024];  // 接收缓冲区
-                    while (true) {
-                        bzero(&buffer, sizeof(buffer));
-                        ssize_t nread = read(ev.data.fd, buffer, sizeof(buffer));
-                        if (nread > 0) {
-                            printf("recv(eventfd=%d): %s\n", ev.data.fd, buffer);
-                            send(ev.data.fd, buffer, strlen(buffer), 0);  // 回显
-                        } else if (nread == -1 && errno == EINTR) {
-                                            continue;  // 信号中断，继续读取
-                        } else if (nread == -1 && ((errno == EAGAIN) || (errno == EWOULDBLOCK))) {
-                                            break;  // 当前已无数据
-                        } else if (nread == 0) {
-                            printf("client(eventfd=%d) disconnected.\n", ev.data.fd);
-                            close(ev.data.fd);
-                            break;
-                        }
-                    }
-                }
-            } else if (ev.events & EPOLLOUT) {
-                // 这里可以放写操作，暂未实现
-            } else {//其他类型
-                printf("client(eventfd=%d) error.\n", ev.data.fd);
-                close(ev.data.fd);  // 异常处理
-            }
+        for (auto &ch:channels) {
+            ch->handleevent(&servsock);
         }
     }
 

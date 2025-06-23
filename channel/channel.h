@@ -7,13 +7,22 @@
 
 #include <sys/epoll.h>
 #include "../epoll/epoll.h"
-
+#include "../inet_address/inet_address.h"
+#include "../socket/socket.h"
 class Epoll;
 
 class Channel
 {
+private:
+    int fd_=-1;                             // Channel拥有的fd，Channel和fd是一对一的关系。
+    Epoll *ep_=nullptr;                // Channel对应的红黑树，Channel与Epoll是多对一的关系，一个Channel只对应一个Epoll。
+    bool inepoll_=false;              // Channel是否已添加到epoll树上，如果未添加，调用epoll_ctl()的时候用EPOLL_CTL_ADD，否则用EPOLL_CTL_MOD。
+    uint32_t events_=0;              // fd_需要监视的事件。listenfd和clientfd需要监视EPOLLIN，clientfd还可能需要监视EPOLLOUT。
+    uint32_t revents_=0;             // fd_已发生的事件。
+    bool islisten_=false;              // listenfd取值为true，客户端连上来的fd取值false。
+
 public:
-    Channel(Epoll* ep,int fd);      // 构造函数。
+    Channel(Epoll* ep,int fd,bool islisten);      // 构造函数。
     ~Channel();                           // 析构函数。
 
     int fd();                                            // 返回fd_成员。
@@ -24,12 +33,8 @@ public:
     bool inpoll();                                  // 返回inepoll_成员。
     uint32_t events();                           // 返回events_成员。
     uint32_t revents();                          // 返回revents_成员。
-private:
-    int fd_=-1;                             // Channel拥有的fd，Channel和fd是一对一的关系。
-    Epoll *ep_=nullptr;                // Channel对应的红黑树，Channel与Epoll是多对一的关系，一个Channel只对应一个Epoll。
-    bool inepoll_=false;              // Channel是否已添加到epoll树上，如果未添加，调用epoll_ctl()的时候用EPOLL_CTL_ADD，否则用EPOLL_CTL_MOD。
-    uint32_t events_=0;              // fd_需要监视的事件。listenfd和clientfd需要监视EPOLLIN，clientfd还可能需要监视EPOLLOUT。
-    uint32_t revents_=0;             // fd_已发生的事件。
+
+    void handleevent(Socket *servsock);    // 事件处理函数，epoll_wait()返回的时候，执行它。
 };
 
 #endif //CHANNEL_H
