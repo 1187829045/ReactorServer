@@ -1,13 +1,10 @@
-//
-// Created by 11878 on 25-6-21.
-//
-
-#include "inet_address.h"
+#include "InetAddress.h"
 
 InetAddress::InetAddress()
 {
 
 }
+
 InetAddress::InetAddress(const std::string &ip,uint16_t port)      // 如果是监听的fd，用这个构造函数。
 {
     addr_.sin_family = AF_INET;                                 // IPv4网络协议的套接字类型。
@@ -35,10 +32,11 @@ uint16_t InetAddress::port() const                // 返回整数表示的端口
     return ntohs(addr_.sin_port);
 }
 
-const struct sockaddr *InetAddress::addr() const   // 返回addr_成员的地址，转换成了sockaddr。
+const sockaddr *InetAddress::addr() const   // 返回addr_成员的地址，转换成了sockaddr。
 {
     return (sockaddr*)&addr_;
 }
+
 void InetAddress::setaddr(sockaddr_in clientaddr)   // 设置addr_成员的值。
 {
     addr_=clientaddr;

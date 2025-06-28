@@ -1,12 +1,13 @@
-//
-// Created by llb on 2025/6/22.
-//
-
-#ifndef SOCKET_H
-#define SOCKET_H
-
+#pragma once
+#include <sys/types.h>
 #include <sys/socket.h>
-#include"../inet_address/inet_address.h"
+#include <netinet/tcp.h>
+#include <string.h>
+#include <errno.h>
+#include <unistd.h>
+#include "InetAddress.h"
+
+// 创建一个非阻塞的socket。
 int createnonblocking();
 
 // socket类。
@@ -25,7 +26,5 @@ public:
     void setkeepalive(bool on);       // 设置SO_KEEPALIVE选项。
     void bind(const InetAddress& servaddr);        // 服务端的socket将调用此函数。
     void listen(int nn=128);                                    // 服务端的socket将调用此函数。
-    int  accept(InetAddress& clientaddr);            // 服务端的socket将调用此函数。
+    int   accept(InetAddress& clientaddr);            // 服务端的socket将调用此函数。
 };
-
-# endif
