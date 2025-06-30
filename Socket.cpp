@@ -1,7 +1,5 @@
 #include "Socket.h"
 
-
-
 // 创建一个非阻塞的socket。
 int createnonblocking()
 {
@@ -9,7 +7,6 @@ int createnonblocking()
     int listenfd = socket(AF_INET,SOCK_STREAM|SOCK_NONBLOCK,IPPROTO_TCP);
     if (listenfd < 0)
     {
-        // perror("socket() failed"); exit(-1);
         printf("%s:%s:%d listen socket create error:%d\n", __FILE__, __FUNCTION__, __LINE__, errno); exit(-1);
     }
     return listenfd;
@@ -30,6 +27,16 @@ Socket::~Socket()
 int Socket::fd() const                              // 返回fd_成员。
 {
     return fd_;
+}
+
+std::string Socket::ip() const                              // 返回ip_成员。
+{
+    return ip_;
+}
+
+uint16_t Socket::port() const                              // 返回port_成员。
+{
+    return port_;
 }
 
 void Socket::settcpnodelay(bool on)
@@ -62,7 +69,16 @@ void Socket::bind(const InetAddress& servaddr)
     {
         perror("bind() failed"); close(fd_); exit(-1);
     }
+
+    setipport(servaddr.ip(),servaddr.port());
 }
+
+ // 设置ip_和port_成员。
+ void Socket::setipport(const std::string &ip,uint16_t port)   
+ {
+    ip_=ip;
+    port_=port;
+ }
 
 void Socket::listen(int nn)
 {
